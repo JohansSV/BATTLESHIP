@@ -34,16 +34,22 @@ GRAY    = ( 60,  60,  60)
 BLUE    = (  0,  50, 255)
 YELLOW  = (255, 255,   0)
 DARKGRAY =( 40,  40,  40)
+AQUA = (0, 128, 128)
+SEA =  (70, 130, 180)
+RED = (255, 0, 0)
+BGCOLOR = (0, 128, 128)
+#Selecciona background
+GBG = pygame.image.load("assets/game_background.jpg")
 
 #Determine what to colour each element of the game
-BGCOLOR = GRAY
-BUTTONCOLOR = GREEN
+
+BUTTONCOLOR = SEA
 TEXTCOLOR = WHITE
-TILECOLOR = GREEN
+TILECOLOR = SEA
 BORDERCOLOR = BLUE
 TEXTSHADOWCOLOR = BLUE
 SHIPCOLOR = YELLOW
-HIGHLIGHTCOLOR = BLUE
+HIGHLIGHTCOLOR = RED
 
 
 def main():
@@ -60,16 +66,18 @@ def main():
     BASICFONT = pygame.font.Font("font.ttf", 20)
     BIGFONT = pygame.font.Font("font.ttf", 50)
     
+
     # Create and label the buttons
-    HELP_SURF = BASICFONT.render("HELP", True, WHITE)
+
+    HELP_SURF = BASICFONT.render("Ayuda", True, WHITE)
     HELP_RECT = HELP_SURF.get_rect()
     HELP_RECT.topleft = (WINDOWWIDTH - 180, WINDOWHEIGHT - 350)
-    NEW_SURF = BASICFONT.render("NEW GAME", True, WHITE)
+    NEW_SURF = BASICFONT.render("Nueva Partida", True, WHITE)
     NEW_RECT = NEW_SURF.get_rect()
     NEW_RECT.topleft = (WINDOWWIDTH - 200, WINDOWHEIGHT - 200)
 
     # The 'Shots:' label at the top
-    SHOTS_SURF = BASICFONT.render("Shots: ", True, WHITE)
+    SHOTS_SURF = BASICFONT.render("Ataques: ", True, WHITE)
     SHOTS_RECT = SHOTS_SURF.get_rect()
     SHOTS_RECT.topleft = (WINDOWWIDTH - 770, WINDOWHEIGHT - 570)
     
@@ -111,7 +119,7 @@ def run_game():
         COUNTER_RECT.topleft = (WINDOWWIDTH - 650, WINDOWHEIGHT - 570)
         
         # Fill background
-        DISPLAYSURF.fill(BGCOLOR)
+        DISPLAYSURF.blit(GBG, (0, 0))
         
         # draw the buttons
         DISPLAYSURF.blit(HELP_SURF, HELP_RECT)
@@ -130,7 +138,7 @@ def run_game():
         for event in pygame.event.get():
             if event.type == MOUSEBUTTONUP:
                 if HELP_RECT.collidepoint(event.pos): #if the help button is clicked on 
-                    DISPLAYSURF.fill(BGCOLOR)
+                    DISPLAYSURF.blit(GBG, (0, 0))
                     show_help_screen() #Show the help screen
                 elif NEW_RECT.collidepoint(event.pos): #if the new game button is clicked on
                     main() #goto main, which resets the game
@@ -181,7 +189,7 @@ def blowup_animation(coord):
     """
     for image in EXPLOSION_IMAGES: # go through the list of images in the list of pictures and play them in sequence 
         #Determine the location and size to display the image
-        image = pygame.transform.scale(image, (TILESIZE+10, TILESIZE+10))
+        image = pygame.transform.scale(image, (TILESIZE+15, TILESIZE+15))
         DISPLAYSURF.blit(image, coord)
         pygame.display.flip()
         FPSCLOCK.tick(EXPLOSIONSPEED) #Determine the delay to play the image with
@@ -465,37 +473,54 @@ def show_help_screen():
     """
     Function display a help screen until any button is pressed.
     """
-    line1_surf, line1_rect = make_text_objs('Press a key to return to the game', 
-                                            BASICFONT, TEXTCOLOR)
+    line1_surf, line1_rect = make_text_objs('Presiona cualquier tecla para volver.', 
+                                            BASICFONT, SHIPCOLOR)
     line1_rect.topleft = (TEXT_LEFT_POSN, TEXT_HEIGHT)
     DISPLAYSURF.blit(line1_surf, line1_rect)
     
     line2_surf, line2_rect = make_text_objs(
-        'This is a battleship puzzle game. Your objective is ' \
-        'to sink all the ships in as few', BASICFONT, TEXTCOLOR)
+        'Este es el juego de Battleship.', BASICFONT, TEXTCOLOR)
     line2_rect.topleft = (TEXT_LEFT_POSN, TEXT_HEIGHT * 3)
     DISPLAYSURF.blit(line2_surf, line2_rect)
 
-    line3_surf, line3_rect = make_text_objs('shots as possible. The markers on'\
-        ' the edges of the game board tell you how', BASICFONT, TEXTCOLOR)
+    line3_surf, line3_rect = make_text_objs('Realiza tiros a los recuadros(Clicks) e intenta acertar', BASICFONT, TEXTCOLOR)
     line3_rect.topleft = (TEXT_LEFT_POSN, TEXT_HEIGHT * 4)
     DISPLAYSURF.blit(line3_surf, line3_rect)
 
-    line4_surf, line4_rect = make_text_objs('many ship pieces are in each'\
-        ' column and row. To reset your game click on', BASICFONT, TEXTCOLOR)
+    line4_surf, line4_rect = make_text_objs('a un objetivo (barco), estos estarán distribuidos al azar', BASICFONT, TEXTCOLOR)
     line4_rect.topleft = (TEXT_LEFT_POSN, TEXT_HEIGHT * 5)
     DISPLAYSURF.blit(line4_surf, line4_rect)
 
-    line5_surf, line5_rect = make_text_objs('the "New Game" button.',
+    line5_surf, line5_rect = make_text_objs('por lo que cada partida será distinta, para ganar derriba',
         BASICFONT, TEXTCOLOR)
     line5_rect.topleft = (TEXT_LEFT_POSN, TEXT_HEIGHT * 6)
     DISPLAYSURF.blit(line5_surf, line5_rect)
+
+    line6_surf, line6_rect = make_text_objs('a todos los barcos enemigos.', BASICFONT, TEXTCOLOR)
+    line6_rect.topleft = (TEXT_LEFT_POSN, TEXT_HEIGHT * 7)
+    DISPLAYSURF.blit(line6_surf, line6_rect)
+
+    line7_surf, line7_rect = make_text_objs('Para reiniciar partida presiona Nueva Partida.', BASICFONT, TEXTCOLOR)
+    line7_rect.topleft = (TEXT_LEFT_POSN, TEXT_HEIGHT * 9)
+    DISPLAYSURF.blit(line7_surf, line7_rect)
+
+    line8_surf, line8_rect = make_text_objs('Juego realizado para la asignatura', BASICFONT, (128, 128, 128))
+    line8_rect.topleft = (TEXT_LEFT_POSN, TEXT_HEIGHT * 20)
+    DISPLAYSURF.blit(line8_surf, line8_rect)
+
+    line8_surf, line8_rect = make_text_objs('Sistemas de comunicaciones', BASICFONT, (128, 128, 128))
+    line8_rect.topleft = (TEXT_LEFT_POSN, TEXT_HEIGHT * 21)
+    DISPLAYSURF.blit(line8_surf, line8_rect)
+
+    line9_surf, line9_rect = make_text_objs('Por equipo: 9', BASICFONT, (128, 128, 128))
+    line9_rect.topleft = (TEXT_LEFT_POSN, TEXT_HEIGHT * 22)
+    DISPLAYSURF.blit(line9_surf, line9_rect)
     
     while check_for_keypress() == None: #Check if the user has pressed keys, if so go back to the game
         pygame.display.update()
         FPSCLOCK.tick()
 
-        
+       
 def check_for_keypress():
     """
     Function checks for any key presses by pulling out all KEYDOWN and KEYUP events from queue.
@@ -528,29 +553,29 @@ def show_gameover_screen(shots_fired):
     
     shots_fired -> the number of shots taken before game is over
     """
-    DISPLAYSURF.fill(BGCOLOR)
-    titleSurf, titleRect = make_text_objs('Congrats! Puzzle solved in:',
+    DISPLAYSURF.blit(GBG, (0, 0))
+    titleSurf, titleRect = make_text_objs('Felicidades! has ganado.',
                                             BIGFONT, TEXTSHADOWCOLOR)
     titleRect.center = (int(WINDOWWIDTH / 2), int(WINDOWHEIGHT / 2))
     DISPLAYSURF.blit(titleSurf, titleRect)
     
-    titleSurf, titleRect = make_text_objs('Congrats! Puzzle solved in:', 
+    titleSurf, titleRect = make_text_objs('Felicidades! has ganado.', 
                                             BIGFONT, TEXTCOLOR)
     titleRect.center = (int(WINDOWWIDTH / 2) - 3, int(WINDOWHEIGHT / 2) - 3)
     DISPLAYSURF.blit(titleSurf, titleRect)
     
-    titleSurf, titleRect = make_text_objs(str(shots_fired) + ' shots', 
+    titleSurf, titleRect = make_text_objs(str(shots_fired) + ' Tiros ', 
                                             BIGFONT, TEXTSHADOWCOLOR)
     titleRect.center = (int(WINDOWWIDTH / 2)), int(WINDOWHEIGHT / 2 + 50)
     DISPLAYSURF.blit(titleSurf, titleRect)
     
-    titleSurf, titleRect = make_text_objs(str(shots_fired) + 'shots', 
+    titleSurf, titleRect = make_text_objs(str(shots_fired) + 'Tiros ', 
                                             BIGFONT, TEXTCOLOR)
     titleRect.center = (int(WINDOWWIDTH / 2), int(WINDOWHEIGHT / 2 + 50) - 3)
     DISPLAYSURF.blit(titleSurf, titleRect)
 
     pressKeySurf, pressKeyRect = make_text_objs(
-        'Press a key to try to beat that score.', BASICFONT, TEXTCOLOR)
+        'Presiona una tecla para intentar romper el record.', BASICFONT, TEXTCOLOR)
     pressKeyRect.center = (int(WINDOWWIDTH / 2), int(WINDOWHEIGHT / 2) + 100)
     DISPLAYSURF.blit(pressKeySurf, pressKeyRect)
     
