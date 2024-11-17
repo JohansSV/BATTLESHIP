@@ -1,21 +1,31 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import random
-import time
-import sys
-import pygame
-import serial  # Importar la biblioteca serial para comunicación con Arduino
+# Importing pygame modules
+import random, sys, pygame
 from pygame.locals import *
-from joystick_control import read_joystick
 
-# Configurar el puerto serial (Asegúrate de que COM3 sea el puerto correcto)
-#arduino = serial.Serial(port='COM3', baudrate=9600, timeout=1)
+#INICIAR MEZCLADOR DE AUDIO
+pygame.mixer.init()
+#EFECTO select
+select_sound = pygame.mixer.Sound("sound/select.mp3")  # Asegúrate de que el archivo esté en el directorio correcto
+select_sound.set_volume(0.5)  # Ajustar el volumen del efecto de sonido
+#EFECTO explosión
+boom_sound = pygame.mixer.Sound("sound/boom.mp3")
+boom_sound.set_volume(0.5)
+#EFECTO bomba al agua
+fail_sound = pygame.mixer.Sound("sound/fail.mp3")
+fail_sound.set_volume(0.5)
+#EFECTO victoria
+win_sound = pygame.mixer.Sound("sound/win.mp3")
+win_sound.set_volume(0.6)
+
+
 
 # Set variables, like screen width and height 
 
 # globals
-FPS = 60 #Determines the number of frames per second
+FPS = 30 #Determines the number of frames per second
 REVEALSPEED = 8 #Determines the speed at which the squares reveals after being clicked
 WINDOWWIDTH = 800 #Width of game window
 WINDOWHEIGHT = 600 #Height of game window
@@ -32,18 +42,23 @@ EXPLOSIONSPEED = 10 #How fast the explosion graphics will play
 
 XMARGIN = int((WINDOWWIDTH - (BOARDWIDTH * TILESIZE) - DISPLAYWIDTH - MARKERSIZE) / 2) #x-position of the top left corner of board 
 YMARGIN = int((WINDOWHEIGHT - (BOARDHEIGHT * TILESIZE) - MARKERSIZE) / 2) #y-position of the top left corner of board
-# Colores
-BLACK = (0, 0, 0)
-WHITE = (255, 255, 255)
-GREEN = (0, 204, 0)
-GRAY = (60, 60, 60)
-BLUE = (0, 50, 255)
-YELLOW = (255, 255, 0)
-DARKGRAY = (40, 40, 40)
-AQUA = (0, 128, 128)
-SEA = (70, 130, 180)
+
+#Colours which will be used by the game
+BLACK   = (  0,   0,   0)
+WHITE   = (255, 255, 255)
+GREEN   = (  0, 204,   0)
+GRAY    = ( 60,  60,  60)
+BLUE    = (  0,  50, 255)
+YELLOW  = (255, 255,   0)
+DARKGRAY =( 40,  40,  40)
+SEA =  (70, 130, 180)
 RED = (255, 0, 0)
 BGCOLOR = (0, 128, 128)
+#Selecciona background
+GBG = pygame.image.load("assets/game_background.jpg")
+
+#Determine what to colour each element of the game
+
 BUTTONCOLOR = SEA
 TEXTCOLOR = WHITE
 TILECOLOR = SEA
@@ -52,116 +67,134 @@ TEXTSHADOWCOLOR = BLUE
 SHIPCOLOR = YELLOW
 HIGHLIGHTCOLOR = RED
 
-# Inicialización de Pygame
-pygame.init()
-DISPLAYSURF = pygame.display.set_mode((WINDOWWIDTH, WINDOWHEIGHT))
-pygame.display.set_caption('Battleship')
-FPSCLOCK = pygame.time.Clock()
-BASICFONT = pygame.font.Font("assets/font.ttf", 20)
-BIGFONT = pygame.font.Font("assets/font.ttf", 50)
-GBG = pygame.image.load("assets/Background.PNG")
 
-# Función principal
 def main():
-    global HELP_SURF, HELP_RECT, NEW_SURF, NEW_RECT, SHOTS_SURF, SHOTS_RECT, COUNTER_SURF, COUNTER_RECT, EXPLOSION_IMAGES
+    """
+    The main function intializes the variables which will be used by the game.
+    """
+    global DISPLAYSURF, FPSCLOCK, BASICFONT, HELP_SURF, HELP_RECT, NEW_SURF, \
+           NEW_RECT, SHOTS_SURF, SHOTS_RECT, BIGFONT, COUNTER_SURF, \
+           COUNTER_RECT, HBUTTON_SURF, EXPLOSION_IMAGES
+    pygame.init()
+    FPSCLOCK = pygame.time.Clock()
+    #Fonts used by the game
+    DISPLAYSURF = pygame.display.set_mode((WINDOWWIDTH, WINDOWHEIGHT))
+    BASICFONT = pygame.font.Font("font.ttf", 20)
+    BIGFONT = pygame.font.Font("font.ttf", 50)
+    
 
-    # Botones y textos iniciales
+    # Create and label the buttons
+
     HELP_SURF = BASICFONT.render("Ayuda", True, WHITE)
     HELP_RECT = HELP_SURF.get_rect()
     HELP_RECT.topleft = (WINDOWWIDTH - 180, WINDOWHEIGHT - 350)
     NEW_SURF = BASICFONT.render("Nueva Partida", True, WHITE)
     NEW_RECT = NEW_SURF.get_rect()
     NEW_RECT.topleft = (WINDOWWIDTH - 200, WINDOWHEIGHT - 200)
+
+    # The 'Shots:' label at the top
     SHOTS_SURF = BASICFONT.render("Ataques: ", True, WHITE)
     SHOTS_RECT = SHOTS_SURF.get_rect()
     SHOTS_RECT.topleft = (WINDOWWIDTH - 770, WINDOWHEIGHT - 570)
-
-    # Cargar imágenes de explosión
+    
+    # Load the explosion graphics from the /img folder
     EXPLOSION_IMAGES = [
         pygame.image.load("img/blowup1.png"), pygame.image.load("img/blowup2.png"),
-        pygame.image.load("img/blowup3.png"), pygame.image.load("img/blowup4.png"),
-        pygame.image.load("img/blowup5.png"), pygame.image.load("img/blowup6.png")
-    ]
+        pygame.image.load("img/blowup3.png"),pygame.image.load("img/blowup4.png"),
+        pygame.image.load("img/blowup5.png"),pygame.image.load("img/blowup6.png")]
+    
+    # Set the title in the menu bar to 'Battleship'
+    pygame.display.set_caption('Battleship')
 
+    # Keep the game running at all times
     while True:
-        shots_taken = run_game()  # Ejecutar el juego
-        show_gameover_screen(shots_taken)  # Pantalla de fin de juego
-
-
+        shots_taken = run_game() #Run the game until it stops and save the result in shots_taken
+        show_gameover_screen(shots_taken) #Display a gameover screen by passing in shots_taken
+        
+        
 def run_game():
-    revealed_tiles = generate_default_tiles(False)
-    main_board = generate_default_tiles(None)
-    ship_objs = ['battleship', 'cruiser1', 'cruiser2', 'destroyer1', 'destroyer2',
-                 'destroyer3', 'submarine1', 'submarine2', 'submarine3', 'submarine4']
-    main_board = add_ships_to_board(main_board, ship_objs)
+    """
+    Function is executed while a game is running.
+    
+    returns the amount of shots taken
+    """
+    revealed_tiles = generate_default_tiles(False) #Contains the list of the tiles revealed by user
+    # main board object, 
+    main_board = generate_default_tiles(None) #Contains the list of the ships which exists on board
+    ship_objs = ['battleship','cruiser1','cruiser2','destroyer1','destroyer2',
+                 'destroyer3','submarine1','submarine2','submarine3','submarine4'] # List of the ships available
+    main_board = add_ships_to_board(main_board, ship_objs) #call add_ships_to_board to add the list of ships to the main_board
+    mousex, mousey = 0, 0 #location of mouse
+    counter = [] #counter to track number of shots fired
+    xmarkers, ymarkers = set_markers(main_board) #The numerical markers on each side of the board
 
-    xmarkers, ymarkers = set_markers(main_board)
-    counter = []
-    cursor_x, cursor_y = 0, 0  # Posición inicial del cursor
-
+    
+    
+    aux_tilex = 0
+    aux_tiley = 0
     while True:
+        # counter display (it needs to be here in order to refresh it)
         COUNTER_SURF = BASICFONT.render(str(len(counter)), True, WHITE)
         COUNTER_RECT = SHOTS_SURF.get_rect()
         COUNTER_RECT.topleft = (WINDOWWIDTH - 650, WINDOWHEIGHT - 570)
+        
+        # Fill background
         DISPLAYSURF.blit(GBG, (0, 0))
+        
+        # draw the buttons
         DISPLAYSURF.blit(HELP_SURF, HELP_RECT)
         DISPLAYSURF.blit(NEW_SURF, NEW_RECT)
         DISPLAYSURF.blit(SHOTS_SURF, SHOTS_RECT)
         DISPLAYSURF.blit(COUNTER_SURF, COUNTER_RECT)
-
+        
+        # Draw the tiles onto the board and their respective markers
         draw_board(main_board, revealed_tiles)
         draw_markers(xmarkers, ymarkers)
-
         
+        mouse_clicked = False
+
+        check_for_quit()
+        #Check for pygame events
+        for event in pygame.event.get():
+            if event.type == MOUSEBUTTONUP:
+                if HELP_RECT.collidepoint(event.pos): #if the help button is clicked on 
+                    DISPLAYSURF.blit(GBG, (0, 0))
+                    show_help_screen() #Show the help screen
+                elif NEW_RECT.collidepoint(event.pos): #if the new game button is clicked on
+                    main() #goto main, which resets the game
+                else: #otherwise
+                    mousex, mousey = event.pos #set mouse positions to the new position
+                    mouse_clicked = True #mouse is clicked but not on a button
+            elif event.type == MOUSEMOTION: #Detected mouse motion
+                mousex, mousey = event.pos #set mouse positions to the new position
         
-        # Leer entrada del Arduino
-        joystick_data = read_joystick()
-        if joystick_data:  # Si los datos no son None
-            xValue = joystick_data["x"]
-            yValue = joystick_data["y"]
-            buttonY = joystick_data["buttonY"]
-            buttonB = joystick_data["buttonB"]
-            buttonA = joystick_data["buttonA"]
-            buttonX = joystick_data["buttonX"]
-            buttonSELECT = joystick_data["buttonSELECT"]
-            
-            # Actualizar posición del cursor según joystick
-            if xValue < 517:  # Joystick hacia la izquierda
-                
-                cursor_x = max(cursor_x - 1, 0)
-            elif xValue > 518:  # Joystick hacia la derecha
-                
-                cursor_x = min(cursor_x + 1, BOARDWIDTH - 1)
-            if yValue > 497:  # Joystick hacia arriba
-                
-                cursor_y = max(cursor_y - 1, 0)
-            elif yValue < 497:  # Joystick hacia abajo
-                
-                cursor_y = min(cursor_y + 1, BOARDHEIGHT - 1)
-
-            # Si se presiona el botón del joystick
-            if buttonA == 1:
-                if not revealed_tiles[cursor_x][cursor_y]:
-                    revealed_tiles[cursor_x][cursor_y] = True
-                    if check_revealed_tile(main_board, [(cursor_x, cursor_y)]):
-                        left, top = left_top_coords_tile(cursor_x, cursor_y)
-                        blowup_animation((left, top))
-                        if check_for_win(main_board, revealed_tiles):
-                            counter.append((cursor_x, cursor_y))
-                            return len(counter)
-                    counter.append((cursor_x, cursor_y))
-            # Dibujar el cursor
-            draw_highlight_tile(cursor_x, cursor_y)
-            pygame.display.update()
-            FPSCLOCK.tick(FPS)    
-             
-            if buttonB == 1:
-                pygame.display.update()
-                show_help_screen()
-                FPSCLOCK.tick()   
+        #Check if the mouse is clicked at a position with a ship piece
+        tilex, tiley = get_tile_at_pixel(mousex, mousey) 
 
 
-# A partir de aqui son las funciones auxiliares
+        if tilex != None and tiley != None:
+            if not revealed_tiles[tilex][tiley]: #if the tile the mouse is on is not revealed
+                if tilex != aux_tilex or tiley != aux_tiley:
+                    select_sound.play()
+                    aux_tilex = tilex
+                    aux_tiley = tiley
+                    
+                draw_highlight_tile(tilex, tiley) # draws the hovering highlight over the tile
+            if not revealed_tiles[tilex][tiley] and mouse_clicked: #if the mouse is clicked on the not revealed tile
+                fail_sound.play()
+                reveal_tile_animation(main_board, [(tilex, tiley)])
+                revealed_tiles[tilex][tiley] = True #set the tile to now be revealed
+                if check_revealed_tile(main_board, [(tilex, tiley)]): # if the clicked position contains a ship piece
+                    left, top = left_top_coords_tile(tilex, tiley)
+                    boom_sound.play()
+                    blowup_animation((left, top)) 
+                    if check_for_win(main_board, revealed_tiles): # check for a win
+                        counter.append((tilex, tiley))
+                        return len(counter) # return the amount of shots taken
+                counter.append((tilex, tiley))
+        pygame.display.update()
+        FPSCLOCK.tick(FPS)
+
 
 def generate_default_tiles(default_value):
     """
@@ -175,7 +208,7 @@ def generate_default_tiles(default_value):
     
     return default_tiles
 
-
+    
 def blowup_animation(coord):
     """
     Function creates the explosition played if a ship is shot.
@@ -184,11 +217,10 @@ def blowup_animation(coord):
     """
     for image in EXPLOSION_IMAGES: # go through the list of images in the list of pictures and play them in sequence 
         #Determine the location and size to display the image
-        image = pygame.transform.scale(image, (TILESIZE+10, TILESIZE+10))
+        image = pygame.transform.scale(image, (TILESIZE+15, TILESIZE+15))
         DISPLAYSURF.blit(image, coord)
         pygame.display.flip()
         FPSCLOCK.tick(EXPLOSIONSPEED) #Determine the delay to play the image with
-
 
 
 def check_revealed_tile(board, tile):
@@ -202,7 +234,6 @@ def check_revealed_tile(board, tile):
     return board[tile[0][0]][tile[0][1]] != None
 
 
-
 def reveal_tile_animation(board, tile_to_reveal):
     """
     Function creates an animation which plays when the mouse is clicked on a tile, and whatever is
@@ -214,6 +245,7 @@ def reveal_tile_animation(board, tile_to_reveal):
     for coverage in range(TILESIZE, (-REVEALSPEED) - 1, -REVEALSPEED): #Plays animation based on reveal speed
         draw_tile_covers(board, tile_to_reveal, coverage)
 
+        
 def draw_tile_covers(board, tile, coverage):
     """
     Function draws the tiles according to a set of variables.
@@ -460,6 +492,7 @@ def draw_highlight_tile(tilex, tiley):
     tilex -> int; x position of tile
     tiley -> int; y position of tile
     """
+
     left, top = left_top_coords_tile(tilex, tiley)
     pygame.draw.rect(DISPLAYSURF, HIGHLIGHTCOLOR,
                     (left, top, TILESIZE, TILESIZE), 4)
@@ -469,47 +502,54 @@ def show_help_screen():
     """
     Function display a help screen until any button is pressed.
     """
-    line1_surf, line1_rect = make_text_objs('Press a key to return to the game', 
-                                            BASICFONT, TEXTCOLOR)
+    line1_surf, line1_rect = make_text_objs('Presiona cualquier tecla para volver.', 
+                                            BASICFONT, SHIPCOLOR)
     line1_rect.topleft = (TEXT_LEFT_POSN, TEXT_HEIGHT)
     DISPLAYSURF.blit(line1_surf, line1_rect)
     
     line2_surf, line2_rect = make_text_objs(
-        'This is a battleship puzzle game. Your objective is ' \
-        'to sink all the ships in as few', BASICFONT, TEXTCOLOR)
+        'Este es el juego de Battleship.', BASICFONT, TEXTCOLOR)
     line2_rect.topleft = (TEXT_LEFT_POSN, TEXT_HEIGHT * 3)
     DISPLAYSURF.blit(line2_surf, line2_rect)
 
-    line3_surf, line3_rect = make_text_objs('shots as possible. The markers on'\
-        ' the edges of the game board tell you how', BASICFONT, TEXTCOLOR)
+    line3_surf, line3_rect = make_text_objs('Realiza tiros a los recuadros(Clicks) e intenta acertar', BASICFONT, TEXTCOLOR)
     line3_rect.topleft = (TEXT_LEFT_POSN, TEXT_HEIGHT * 4)
     DISPLAYSURF.blit(line3_surf, line3_rect)
 
-    line4_surf, line4_rect = make_text_objs('many ship pieces are in each'\
-        ' column and row. To reset your game click on', BASICFONT, TEXTCOLOR)
+    line4_surf, line4_rect = make_text_objs('a un objetivo (barco), estos estarán distribuidos al azar', BASICFONT, TEXTCOLOR)
     line4_rect.topleft = (TEXT_LEFT_POSN, TEXT_HEIGHT * 5)
     DISPLAYSURF.blit(line4_surf, line4_rect)
 
-    line5_surf, line5_rect = make_text_objs('the "New Game" button.',
+    line5_surf, line5_rect = make_text_objs('por lo que cada partida será distinta, para ganar derriba',
         BASICFONT, TEXTCOLOR)
     line5_rect.topleft = (TEXT_LEFT_POSN, TEXT_HEIGHT * 6)
     DISPLAYSURF.blit(line5_surf, line5_rect)
 
-    joystick_data = read_joystick()
-    if joystick_data:  # Si los datos no son None
-            xValue = joystick_data["x"]
-            yValue = joystick_data["y"]
-            buttonY = joystick_data["buttonY"]
-            buttonB = joystick_data["buttonB"]
-            buttonA = joystick_data["buttonA"]
-            buttonX = joystick_data["buttonX"]
-            buttonSELECT = joystick_data["buttonSELECT"]
+    line6_surf, line6_rect = make_text_objs('a todos los barcos enemigos.', BASICFONT, TEXTCOLOR)
+    line6_rect.topleft = (TEXT_LEFT_POSN, TEXT_HEIGHT * 7)
+    DISPLAYSURF.blit(line6_surf, line6_rect)
 
-            while buttonB == 1: #Check if the user has pressed keys, if so go back to the game
-                pygame.display.update()
-                FPSCLOCK.tick()
+    line7_surf, line7_rect = make_text_objs('Para reiniciar partida presiona Nueva Partida.', BASICFONT, TEXTCOLOR)
+    line7_rect.topleft = (TEXT_LEFT_POSN, TEXT_HEIGHT * 9)
+    DISPLAYSURF.blit(line7_surf, line7_rect)
 
-        
+    line8_surf, line8_rect = make_text_objs('Juego realizado para la asignatura', BASICFONT, (128, 128, 128))
+    line8_rect.topleft = (TEXT_LEFT_POSN, TEXT_HEIGHT * 20)
+    DISPLAYSURF.blit(line8_surf, line8_rect)
+
+    line8_surf, line8_rect = make_text_objs('Sistemas de comunicaciones', BASICFONT, (128, 128, 128))
+    line8_rect.topleft = (TEXT_LEFT_POSN, TEXT_HEIGHT * 21)
+    DISPLAYSURF.blit(line8_surf, line8_rect)
+
+    line9_surf, line9_rect = make_text_objs('Por equipo: 9', BASICFONT, (128, 128, 128))
+    line9_rect.topleft = (TEXT_LEFT_POSN, TEXT_HEIGHT * 22)
+    DISPLAYSURF.blit(line9_surf, line9_rect)
+    
+    while check_for_keypress() == None: #Check if the user has pressed keys, if so go back to the game
+        pygame.display.update()
+        FPSCLOCK.tick()
+
+       
 def check_for_keypress():
     """
     Function checks for any key presses by pulling out all KEYDOWN and KEYUP events from queue.
@@ -537,52 +577,42 @@ def make_text_objs(text, font, color):
 
 
 def show_gameover_screen(shots_fired):
+    win_sound.play()
     """
     Function display a gameover screen when the user has successfully shot at every ship pieces.
     
     shots_fired -> the number of shots taken before game is over
     """
-    DISPLAYSURF.fill(BGCOLOR)
-    titleSurf, titleRect = make_text_objs('Congrats! Puzzle solved in:',
+    DISPLAYSURF.blit(GBG, (0, 0))
+    titleSurf, titleRect = make_text_objs('Felicidades! has ganado. ',
                                             BIGFONT, TEXTSHADOWCOLOR)
     titleRect.center = (int(WINDOWWIDTH / 2), int(WINDOWHEIGHT / 2))
     DISPLAYSURF.blit(titleSurf, titleRect)
     
-    titleSurf, titleRect = make_text_objs('Congrats! Puzzle solved in:', 
+    titleSurf, titleRect = make_text_objs('Felicidades! has ganado. ', 
                                             BIGFONT, TEXTCOLOR)
     titleRect.center = (int(WINDOWWIDTH / 2) - 3, int(WINDOWHEIGHT / 2) - 3)
     DISPLAYSURF.blit(titleSurf, titleRect)
     
-    titleSurf, titleRect = make_text_objs(str(shots_fired) + ' shots', 
+    titleSurf, titleRect = make_text_objs(str(shots_fired) + '  Tiros', 
                                             BIGFONT, TEXTSHADOWCOLOR)
     titleRect.center = (int(WINDOWWIDTH / 2)), int(WINDOWHEIGHT / 2 + 50)
     DISPLAYSURF.blit(titleSurf, titleRect)
     
-    titleSurf, titleRect = make_text_objs(str(shots_fired) + 'shots', 
+    titleSurf, titleRect = make_text_objs(str(shots_fired) + '  Tiros', 
                                             BIGFONT, TEXTCOLOR)
     titleRect.center = (int(WINDOWWIDTH / 2), int(WINDOWHEIGHT / 2 + 50) - 3)
     DISPLAYSURF.blit(titleSurf, titleRect)
 
     pressKeySurf, pressKeyRect = make_text_objs(
-        'Press a key to try to beat that score.', BASICFONT, TEXTCOLOR)
+        'Presiona una tecla para intentar romper el record.', BASICFONT, TEXTCOLOR)
     pressKeyRect.center = (int(WINDOWWIDTH / 2), int(WINDOWHEIGHT / 2) + 100)
     DISPLAYSURF.blit(pressKeySurf, pressKeyRect)
     
-    joystick_data = read_joystick()
-    if joystick_data:  # Si los datos no son None
-            xValue = joystick_data["x"]
-            yValue = joystick_data["y"]
-            buttonY = joystick_data["buttonY"]
-            buttonB = joystick_data["buttonB"]
-            buttonA = joystick_data["buttonA"]
-            buttonX = joystick_data["buttonX"]
-            buttonSELECT = joystick_data["buttonSELECT"]
-
-    while buttonA == 1: #Check if the user has pressed keys, if so start a new game
+    while check_for_keypress() == None: #Check if the user has pressed keys, if so start a new game
         pygame.display.update()
-        FPSCLOCK.tick()   
-
+        FPSCLOCK.tick()    
+        
     
-
-if __name__ == "__main__":
+if __name__ == "__main__": #This calls the game loop
     main()
