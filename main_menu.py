@@ -7,6 +7,17 @@ from joystick_control import read_joystick  # Importar la función del joystick
 
 pygame.init()
 
+#INICIAR MEZCLADOR DE AUDIO
+pygame.mixer.init()
+
+#REPRODUCIR MÚSICA
+pygame.mixer.music.load("sound/main.mp3")  # Abrir la musiquilla
+pygame.mixer.music.set_volume(0.5)  # Ajustar el volumen al 50%
+pygame.mixer.music.play(-1)  # Reproducir en bucle infinito
+#EFECTO CLICK
+click_sound = pygame.mixer.Sound("sound/click.mp3")  # Asegúrate de que el archivo esté en el directorio correcto
+click_sound.set_volume(0.3)  # Ajustar el volumen del efecto de sonido
+
 # Configuración de la pantalla
 SCREEN = pygame.display.set_mode((1280, 720))
 pygame.display.set_caption("Menu")
@@ -119,8 +130,10 @@ def main_menu():
             if joystick_input["buttonA"]:
                 selected_option = menu_items[cursor_index]
                 if selected_option == "PLAY":
+                    click_sound.play() #Reproduce sonido 
                     main()
                 elif selected_option == "OPTIONS":
+                    click_sound.play() #Reproduce sonido 
                     options()
                 elif selected_option == "QUIT":
                     pygame.quit()
