@@ -2,7 +2,14 @@ import serial
 import time
 
 # Configuración del puerto serie
-arduino = serial.Serial(port='COM3', baudrate=9600, timeout=1)  
+try:
+    arduino = serial.Serial(port='COM3', baudrate=9600, timeout=1)
+    print("Arduino conectado exitosamente.")
+    arduino_connected = True
+except serial.SerialException:
+    print("Advertencia: No se pudo conectar al Arduino. Continuando sin joystick.")
+    arduino = None
+    arduino_connected = False
 
 # Configuración de la zona muerta
 DEAD_ZONE = 10  # Rango en el que se ignoran los pequeños cambios 
@@ -13,6 +20,10 @@ last_y = 497  # Valor neutro aproximado del eje Y
 
 def read_joystick():
     global last_x, last_y  # Usamos variables globales para conservar el último estado
+
+    if not arduino_connected:
+        return None  # Ignora la lectura si el Arduino no está conectado
+
     if arduino.in_waiting > 0:
         data = arduino.readline().decode('utf-8').strip()
         try:
@@ -44,7 +55,6 @@ def read_joystick():
             print("Error al procesar los datos del joystick.")
             return None
     return None
-
 
   
 

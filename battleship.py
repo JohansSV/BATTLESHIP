@@ -9,8 +9,15 @@ import serial  # Importar la biblioteca serial para comunicación con Arduino
 from pygame.locals import *
 from joystick_control import read_joystick
 
-# Configurar el puerto serial (Asegúrate de que COM3 sea el puerto correcto)
-#arduino = serial.Serial(port='COM3', baudrate=9600, timeout=1)
+# Configuración del puerto serie
+try:
+    arduino = serial.Serial(port='COM3', baudrate=9600, timeout=1)
+    print("Arduino conectado exitosamente.")
+    arduino_connected = True
+except serial.SerialException:
+    print("Advertencia: No se pudo conectar al Arduino. Continuando sin joystick.")
+    arduino = None
+    arduino_connected = False
 
 # Set variables, like screen width and height 
 
@@ -32,18 +39,22 @@ EXPLOSIONSPEED = 10 #How fast the explosion graphics will play
 
 XMARGIN = int((WINDOWWIDTH - (BOARDWIDTH * TILESIZE) - DISPLAYWIDTH - MARKERSIZE) / 2) #x-position of the top left corner of board 
 YMARGIN = int((WINDOWHEIGHT - (BOARDHEIGHT * TILESIZE) - MARKERSIZE) / 2) #y-position of the top left corner of board
+
 # Colores
-BLACK = (0, 0, 0)
-WHITE = (255, 255, 255)
-GREEN = (0, 204, 0)
-GRAY = (60, 60, 60)
-BLUE = (0, 50, 255)
-YELLOW = (255, 255, 0)
-DARKGRAY = (40, 40, 40)
-AQUA = (0, 128, 128)
-SEA = (70, 130, 180)
+
+BLACK   = (  0,   0,   0)
+WHITE   = (255, 255, 255)
+GREEN   = (  0, 204,   0)
+GRAY    = ( 60,  60,  60)
+BLUE    = (  0,  50, 255)
+YELLOW  = (255, 255,   0)
+DARKGRAY =( 40,  40,  40)
+SEA =  (70, 130, 180)
 RED = (255, 0, 0)
 BGCOLOR = (0, 128, 128)
+#Selecciona background
+GBG = pygame.image.load("assets/game_background.jpg")
+
 BUTTONCOLOR = SEA
 TEXTCOLOR = WHITE
 TILECOLOR = SEA
@@ -52,19 +63,34 @@ TEXTSHADOWCOLOR = BLUE
 SHIPCOLOR = YELLOW
 HIGHLIGHTCOLOR = RED
 
-# Inicialización de Pygame
-pygame.init()
-DISPLAYSURF = pygame.display.set_mode((WINDOWWIDTH, WINDOWHEIGHT))
-pygame.display.set_caption('Battleship')
-FPSCLOCK = pygame.time.Clock()
-BASICFONT = pygame.font.Font("assets/font.ttf", 20)
-BIGFONT = pygame.font.Font("assets/font.ttf", 50)
-GBG = pygame.image.load("assets/Background.PNG")
+#INICIAR MEZCLADOR DE AUDIO
+pygame.mixer.init()
+#EFECTO select
+select_sound = pygame.mixer.Sound("sound/select.mp3")  # Asegúrate de que el archivo esté en el directorio correcto
+select_sound.set_volume(0.5)  # Ajustar el volumen del efecto de sonido
+#EFECTO explosión
+boom_sound = pygame.mixer.Sound("sound/boom.mp3")
+boom_sound.set_volume(0.5)
+#EFECTO bomba al agua
+fail_sound = pygame.mixer.Sound("sound/fail.mp3")
+fail_sound.set_volume(0.5)
+#EFECTO victoria
+win_sound = pygame.mixer.Sound("sound/win.mp3")
+win_sound.set_volume(0.6)
 
 # Función principal
 def main():
-    global HELP_SURF, HELP_RECT, NEW_SURF, NEW_RECT, SHOTS_SURF, SHOTS_RECT, COUNTER_SURF, COUNTER_RECT, EXPLOSION_IMAGES
 
+    global DISPLAYSURF, FPSCLOCK, BASICFONT, HELP_SURF, HELP_RECT, NEW_SURF, \
+           NEW_RECT, SHOTS_SURF, SHOTS_RECT, BIGFONT, COUNTER_SURF, \
+           COUNTER_RECT, EXPLOSION_IMAGES
+    # Inicialización de Pygame
+    pygame.init()
+    DISPLAYSURF = pygame.display.set_mode((WINDOWWIDTH, WINDOWHEIGHT))
+    pygame.display.set_caption('Battleship')
+    FPSCLOCK = pygame.time.Clock()
+    BASICFONT = pygame.font.Font("assets/font.ttf", 20)
+    BIGFONT = pygame.font.Font("assets/font.ttf", 50)
     # Botones y textos iniciales
     HELP_SURF = BASICFONT.render("Ayuda", True, WHITE)
     HELP_RECT = HELP_SURF.get_rect()
@@ -82,7 +108,6 @@ def main():
         pygame.image.load("img/blowup3.png"), pygame.image.load("img/blowup4.png"),
         pygame.image.load("img/blowup5.png"), pygame.image.load("img/blowup6.png")
     ]
-
     while True:
         shots_taken = run_game()  # Ejecutar el juego
         show_gameover_screen(shots_taken)  # Pantalla de fin de juego
@@ -98,7 +123,10 @@ def run_game():
     xmarkers, ymarkers = set_markers(main_board)
     counter = []
     cursor_x, cursor_y = 0, 0  # Posición inicial del cursor
+    mousex, mousey = 0, 0 #para mouse
 
+    aux_tilex = 0 #Auxiliares para sonido, evitan que selección se repita en loop
+    aux_tiley = 0
     while True:
         COUNTER_SURF = BASICFONT.render(str(len(counter)), True, WHITE)
         COUNTER_RECT = SHOTS_SURF.get_rect()
@@ -112,53 +140,102 @@ def run_game():
         draw_board(main_board, revealed_tiles)
         draw_markers(xmarkers, ymarkers)
 
-        
-        
-        # Leer entrada del Arduino
-        joystick_data = read_joystick()
-        if joystick_data:  # Si los datos no son None
-            xValue = joystick_data["x"]
-            yValue = joystick_data["y"]
-            buttonY = joystick_data["buttonY"]
-            buttonB = joystick_data["buttonB"]
-            buttonA = joystick_data["buttonA"]
-            buttonX = joystick_data["buttonX"]
-            buttonSELECT = joystick_data["buttonSELECT"]
+        if arduino_connected == False:
+            #Apartado para funcionalidad del mouse
+            mouse_clicked = False
+            check_for_quit()
+            #Check for pygame events
+            for event in pygame.event.get():
+                if event.type == MOUSEBUTTONUP:
+                    if HELP_RECT.collidepoint(event.pos): #if the help button is clicked on 
+                        DISPLAYSURF.blit(GBG, (0, 0))
+                        show_help_screen() #Show the help screen
+                    elif NEW_RECT.collidepoint(event.pos): #if the new game button is clicked on
+                        main() #goto main, which resets the game
+                    else: #otherwise
+                        mousex, mousey = event.pos #set mouse positions to the new position
+                        mouse_clicked = True #mouse is clicked but not on a button
+                elif event.type == MOUSEMOTION: #Detected mouse motion
+                    mousex, mousey = event.pos #set mouse positions to the new position
             
-            # Actualizar posición del cursor según joystick
-            if xValue < 517:  # Joystick hacia la izquierda
-                
-                cursor_x = max(cursor_x - 1, 0)
-            elif xValue > 518:  # Joystick hacia la derecha
-                
-                cursor_x = min(cursor_x + 1, BOARDWIDTH - 1)
-            if yValue > 497:  # Joystick hacia arriba
-                
-                cursor_y = max(cursor_y - 1, 0)
-            elif yValue < 497:  # Joystick hacia abajo
-                
-                cursor_y = min(cursor_y + 1, BOARDHEIGHT - 1)
+            #Check if the mouse is clicked at a position with a ship piece
+            tilex, tiley = get_tile_at_pixel(mousex, mousey) 
 
-            # Si se presiona el botón del joystick
-            if buttonA == 1:
-                if not revealed_tiles[cursor_x][cursor_y]:
-                    revealed_tiles[cursor_x][cursor_y] = True
-                    if check_revealed_tile(main_board, [(cursor_x, cursor_y)]):
-                        left, top = left_top_coords_tile(cursor_x, cursor_y)
-                        blowup_animation((left, top))
-                        if check_for_win(main_board, revealed_tiles):
-                            counter.append((cursor_x, cursor_y))
-                            return len(counter)
-                    counter.append((cursor_x, cursor_y))
-            # Dibujar el cursor
-            draw_highlight_tile(cursor_x, cursor_y)
+            if tilex != None and tiley != None:
+                if not revealed_tiles[tilex][tiley]: #if the tile the mouse is on is not revealed
+                    if tilex != aux_tilex or tiley != aux_tiley:
+                        select_sound.play()
+                        aux_tilex = tilex
+                        aux_tiley = tiley
+                        
+                    draw_highlight_tile(tilex, tiley) # draws the hovering highlight over the tile
+                if not revealed_tiles[tilex][tiley] and mouse_clicked: #if the mouse is clicked on the not revealed tile
+                    fail_sound.play()
+                    reveal_tile_animation(main_board, [(tilex, tiley)])
+                    revealed_tiles[tilex][tiley] = True #set the tile to now be revealed
+                    if check_revealed_tile(main_board, [(tilex, tiley)]): # if the clicked position contains a ship piece
+                        left, top = left_top_coords_tile(tilex, tiley)
+                        boom_sound.play()
+                        blowup_animation((left, top)) 
+                        if check_for_win(main_board, revealed_tiles): # check for a win
+                            counter.append((tilex, tiley))
+                            return len(counter) # return the amount of shots taken
+                    counter.append((tilex, tiley))
             pygame.display.update()
-            FPSCLOCK.tick(FPS)    
-             
-            if buttonB == 1:
+        else: 
+            # Leer entrada del Arduino
+            joystick_data = read_joystick()
+            if joystick_data:  # Si los datos no son None
+                xValue = joystick_data["x"]
+                yValue = joystick_data["y"]
+                buttonY = joystick_data["buttonY"]
+                buttonB = joystick_data["buttonB"]
+                buttonA = joystick_data["buttonA"]
+                buttonX = joystick_data["buttonX"]
+                buttonSELECT = joystick_data["buttonSELECT"]
+                
+                # Actualizar posición del cursor según joystick
+                if xValue < 517:  # Joystick hacia la izquierda
+                    select_sound.play() #SONIDO SELECCIÓN BORDE ROJO
+                    cursor_x = max(cursor_x - 1, 0)
+                elif xValue > 518:  # Joystick hacia la derecha
+                    select_sound.play() #SONIDO SELECCIÓN BORDE ROJO
+                    cursor_x = min(cursor_x + 1, BOARDWIDTH - 1)
+                if yValue > 497:  # Joystick hacia arriba
+                    select_sound.play() #SONIDO SELECCIÓN BORDE ROJO
+                    cursor_y = max(cursor_y - 1, 0)
+                elif yValue < 497:  # Joystick hacia abajo
+                    select_sound.play() #SONIDO SELECCIÓN BORDE ROJO
+                    cursor_y = min(cursor_y + 1, BOARDHEIGHT - 1)
+
+                # Si se presiona el botón del joystick
+                if buttonA == 1:
+                    if not revealed_tiles[cursor_x][cursor_y]:
+                        fail_sound.play() #SONIDO cuando no hubo barco
+                        revealed_tiles[cursor_x][cursor_y] = True
+                        if check_revealed_tile(main_board, [(cursor_x, cursor_y)]):
+                            left, top = left_top_coords_tile(cursor_x, cursor_y)
+                            boom_sound.play() #sonido cuando si hubo barco
+                            blowup_animation((left, top))
+                            if check_for_win(main_board, revealed_tiles):
+                                counter.append((cursor_x, cursor_y))
+                                return len(counter)
+                        counter.append((cursor_x, cursor_y))
+                # Dibujar el cursor
+                """ EN CASO DE HABER ERROR DE LOOP DE SONIDO DE SELECCIÓN
+                if tilex != aux_tilex or tiley != aux_tiley:
+                        select_sound.play() #SONIDO DE SELECCIÓN borde rojo
+                        aux_tilex = tilex
+                        aux_tiley = tiley
+                """
+                draw_highlight_tile(cursor_x, cursor_y)
                 pygame.display.update()
-                show_help_screen()
-                FPSCLOCK.tick()   
+                FPSCLOCK.tick(FPS)    
+                 
+                if buttonB == 1:
+                    pygame.display.update()
+                    show_help_screen()
+                    FPSCLOCK.tick()   
 
 
 # A partir de aqui son las funciones auxiliares
@@ -469,47 +546,69 @@ def show_help_screen():
     """
     Function display a help screen until any button is pressed.
     """
-    line1_surf, line1_rect = make_text_objs('Press a key to return to the game', 
-                                            BASICFONT, TEXTCOLOR)
+    line1_surf, line1_rect = make_text_objs('Presiona cualquier tecla para volver.', 
+                                            BASICFONT, SHIPCOLOR)
     line1_rect.topleft = (TEXT_LEFT_POSN, TEXT_HEIGHT)
     DISPLAYSURF.blit(line1_surf, line1_rect)
     
     line2_surf, line2_rect = make_text_objs(
-        'This is a battleship puzzle game. Your objective is ' \
-        'to sink all the ships in as few', BASICFONT, TEXTCOLOR)
+        'Este es el juego de Battleship.', BASICFONT, TEXTCOLOR)
     line2_rect.topleft = (TEXT_LEFT_POSN, TEXT_HEIGHT * 3)
     DISPLAYSURF.blit(line2_surf, line2_rect)
 
-    line3_surf, line3_rect = make_text_objs('shots as possible. The markers on'\
-        ' the edges of the game board tell you how', BASICFONT, TEXTCOLOR)
+    line3_surf, line3_rect = make_text_objs('Realiza tiros a los recuadros(Clicks) e intenta acertar', BASICFONT, TEXTCOLOR)
     line3_rect.topleft = (TEXT_LEFT_POSN, TEXT_HEIGHT * 4)
     DISPLAYSURF.blit(line3_surf, line3_rect)
 
-    line4_surf, line4_rect = make_text_objs('many ship pieces are in each'\
-        ' column and row. To reset your game click on', BASICFONT, TEXTCOLOR)
+    line4_surf, line4_rect = make_text_objs('a un objetivo (barco), estos estarán distribuidos al azar', BASICFONT, TEXTCOLOR)
     line4_rect.topleft = (TEXT_LEFT_POSN, TEXT_HEIGHT * 5)
     DISPLAYSURF.blit(line4_surf, line4_rect)
 
-    line5_surf, line5_rect = make_text_objs('the "New Game" button.',
+    line5_surf, line5_rect = make_text_objs('por lo que cada partida será distinta, para ganar derriba',
         BASICFONT, TEXTCOLOR)
     line5_rect.topleft = (TEXT_LEFT_POSN, TEXT_HEIGHT * 6)
     DISPLAYSURF.blit(line5_surf, line5_rect)
 
-    joystick_data = read_joystick()
-    if joystick_data:  # Si los datos no son None
-            xValue = joystick_data["x"]
-            yValue = joystick_data["y"]
-            buttonY = joystick_data["buttonY"]
-            buttonB = joystick_data["buttonB"]
-            buttonA = joystick_data["buttonA"]
-            buttonX = joystick_data["buttonX"]
-            buttonSELECT = joystick_data["buttonSELECT"]
+    line6_surf, line6_rect = make_text_objs('a todos los barcos enemigos.', BASICFONT, TEXTCOLOR)
+    line6_rect.topleft = (TEXT_LEFT_POSN, TEXT_HEIGHT * 7)
+    DISPLAYSURF.blit(line6_surf, line6_rect)
 
-            while buttonB == 1: #Check if the user has pressed keys, if so go back to the game
-                pygame.display.update()
-                FPSCLOCK.tick()
+    line7_surf, line7_rect = make_text_objs('Para reiniciar partida presiona Nueva Partida.', BASICFONT, TEXTCOLOR)
+    line7_rect.topleft = (TEXT_LEFT_POSN, TEXT_HEIGHT * 9)
+    DISPLAYSURF.blit(line7_surf, line7_rect)
 
-        
+    line8_surf, line8_rect = make_text_objs('Juego realizado para la asignatura', BASICFONT, (128, 128, 128))
+    line8_rect.topleft = (TEXT_LEFT_POSN, TEXT_HEIGHT * 20)
+    DISPLAYSURF.blit(line8_surf, line8_rect)
+
+    line8_surf, line8_rect = make_text_objs('Sistemas de comunicaciones', BASICFONT, (128, 128, 128))
+    line8_rect.topleft = (TEXT_LEFT_POSN, TEXT_HEIGHT * 21)
+    DISPLAYSURF.blit(line8_surf, line8_rect)
+
+    line9_surf, line9_rect = make_text_objs('Por equipo: 9', BASICFONT, (128, 128, 128))
+    line9_rect.topleft = (TEXT_LEFT_POSN, TEXT_HEIGHT * 22)
+    DISPLAYSURF.blit(line9_surf, line9_rect)
+    
+
+    if arduino_connected == True:
+        joystick_data = read_joystick()
+        if joystick_data:  # Si los datos no son None
+                xValue = joystick_data["x"]
+                yValue = joystick_data["y"]
+                buttonY = joystick_data["buttonY"]
+                buttonB = joystick_data["buttonB"]
+                buttonA = joystick_data["buttonA"]
+                buttonX = joystick_data["buttonX"]
+                buttonSELECT = joystick_data["buttonSELECT"]
+
+                while buttonB == 1: #Check if the user has pressed keys, if so go back to the game
+                    pygame.display.update()
+                    FPSCLOCK.tick()
+    else: 
+        while check_for_keypress() == None: #Check if the user has pressed keys, if so go back to the game
+            pygame.display.update()
+            FPSCLOCK.tick()
+
 def check_for_keypress():
     """
     Function checks for any key presses by pulling out all KEYDOWN and KEYUP events from queue.
@@ -537,52 +636,58 @@ def make_text_objs(text, font, color):
 
 
 def show_gameover_screen(shots_fired):
+    win_sound.play()
     """
     Function display a gameover screen when the user has successfully shot at every ship pieces.
     
     shots_fired -> the number of shots taken before game is over
     """
-    DISPLAYSURF.fill(BGCOLOR)
-    titleSurf, titleRect = make_text_objs('Congrats! Puzzle solved in:',
+    DISPLAYSURF.blit(GBG, (0, 0))
+    titleSurf, titleRect = make_text_objs('Felicidades! has ganado. ',
                                             BIGFONT, TEXTSHADOWCOLOR)
     titleRect.center = (int(WINDOWWIDTH / 2), int(WINDOWHEIGHT / 2))
     DISPLAYSURF.blit(titleSurf, titleRect)
     
-    titleSurf, titleRect = make_text_objs('Congrats! Puzzle solved in:', 
+    titleSurf, titleRect = make_text_objs('Felicidades! has ganado. ', 
                                             BIGFONT, TEXTCOLOR)
     titleRect.center = (int(WINDOWWIDTH / 2) - 3, int(WINDOWHEIGHT / 2) - 3)
     DISPLAYSURF.blit(titleSurf, titleRect)
     
-    titleSurf, titleRect = make_text_objs(str(shots_fired) + ' shots', 
+    titleSurf, titleRect = make_text_objs(str(shots_fired) + '  Tiros', 
                                             BIGFONT, TEXTSHADOWCOLOR)
     titleRect.center = (int(WINDOWWIDTH / 2)), int(WINDOWHEIGHT / 2 + 50)
     DISPLAYSURF.blit(titleSurf, titleRect)
     
-    titleSurf, titleRect = make_text_objs(str(shots_fired) + 'shots', 
+    titleSurf, titleRect = make_text_objs(str(shots_fired) + '  Tiros', 
                                             BIGFONT, TEXTCOLOR)
     titleRect.center = (int(WINDOWWIDTH / 2), int(WINDOWHEIGHT / 2 + 50) - 3)
     DISPLAYSURF.blit(titleSurf, titleRect)
 
     pressKeySurf, pressKeyRect = make_text_objs(
-        'Press a key to try to beat that score.', BASICFONT, TEXTCOLOR)
+        'Presiona una tecla para intentar romper el record.', BASICFONT, TEXTCOLOR)
     pressKeyRect.center = (int(WINDOWWIDTH / 2), int(WINDOWHEIGHT / 2) + 100)
     DISPLAYSURF.blit(pressKeySurf, pressKeyRect)
     
-    joystick_data = read_joystick()
-    if joystick_data:  # Si los datos no son None
-            xValue = joystick_data["x"]
-            yValue = joystick_data["y"]
-            buttonY = joystick_data["buttonY"]
-            buttonB = joystick_data["buttonB"]
-            buttonA = joystick_data["buttonA"]
-            buttonX = joystick_data["buttonX"]
-            buttonSELECT = joystick_data["buttonSELECT"]
+    #Si arduino está conectado y si no.
+    if arduino_connected == False:
+        while check_for_keypress() == None: #Check if the user has pressed keys, if so start a new game
+            pygame.display.update()
+            FPSCLOCK.tick()   
+    else: 
+        joystick_data = read_joystick()
+        if joystick_data:  # Si los datos no son None
+                xValue = joystick_data["x"]
+                yValue = joystick_data["y"]
+                buttonY = joystick_data["buttonY"]
+                buttonB = joystick_data["buttonB"]
+                buttonA = joystick_data["buttonA"]
+                buttonX = joystick_data["buttonX"]
+                buttonSELECT = joystick_data["buttonSELECT"]
 
-    while buttonA == 1: #Check if the user has pressed keys, if so start a new game
-        pygame.display.update()
-        FPSCLOCK.tick()   
+        while buttonA == 1: #Check if the user has pressed keys, if so start a new game
+            pygame.display.update()
+            FPSCLOCK.tick()   
 
-    
 
 if __name__ == "__main__":
     main()

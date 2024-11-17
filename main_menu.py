@@ -7,6 +7,17 @@ from joystick_control import read_joystick  # Importar la función del joystick
 
 pygame.init()
 
+#INICIAR MEZCLADOR DE AUDIO
+pygame.mixer.init()
+
+#REPRODUCIR MÚSICA
+pygame.mixer.music.load("sound/main.mp3")  # Asegúrate de que el archivo esté en el directorio correcto
+pygame.mixer.music.set_volume(0.5)  # Ajustar el volumen al 50%
+pygame.mixer.music.play(-1)  # Reproducir en bucle infinito
+#EFECTO CLICK
+click_sound = pygame.mixer.Sound("sound/click.mp3")  # Asegúrate de que el archivo esté en el directorio correcto
+click_sound.set_volume(0.3)  # Ajustar el volumen del efecto de sonido
+
 # Configuración de la pantalla
 SCREEN = pygame.display.set_mode((1280, 720))
 pygame.display.set_caption("Menu")
@@ -80,14 +91,15 @@ def options():
 
 def main_menu():
     cursor_index = 0  # Índice para manejar la selección en el menú
+
     menu_items = ["PLAY", "OPTIONS", "QUIT"]  # Opciones del menú
     buttons = [
-        Button(image=pygame.image.load("assets/Play Rect.png"), pos=(640, 250),
-               text_input="PLAY", font=get_font(75), base_color="#d7fcd4", hovering_color="White"),
-        Button(image=pygame.image.load("assets/Options Rect.png"), pos=(640, 400),
-               text_input="OPTIONS", font=get_font(75), base_color="#d7fcd4", hovering_color="White"),
-        Button(image=pygame.image.load("assets/Quit Rect.png"), pos=(640, 550),
-               text_input="QUIT", font=get_font(75), base_color="#d7fcd4", hovering_color="White")
+        Button(image=pygame.image.load("assets/Play Rect.png"), pos=(640, 250), 
+                            text_input="JUGAR", font=get_font(75), base_color="#d7fcd4", hovering_color="White"),
+        Button(image=pygame.image.load("assets/Options Rect.png"), pos=(640, 400), 
+                            text_input="OPCIONES", font=get_font(75), base_color="#d7fcd4", hovering_color="White"),
+        Button(image=pygame.image.load("assets/Quit Rect.png"), pos=(640, 550), 
+                            text_input="SALIR", font=get_font(75), base_color="#d7fcd4", hovering_color="White")
     ]
 
     while True:
@@ -95,8 +107,18 @@ def main_menu():
         MENU_MOUSE_POS = pygame.mouse.get_pos()
 
         MENU_TEXT = get_font(100).render("BATTLESHIP", True, "#b68f40")
-        MENU_RECT = MENU_TEXT.get_rect(center=(640, 100))
+        MENU_RECT = MENU_TEXT.get_rect(center=(640, 70))
+        MENU_TEXT1 = get_font(60).render("STELIOS", True, "#7aa3d5")
+        MENU_RECT1 = MENU_TEXT1.get_rect(center=(640, 150))
+
+        PLAY_BUTTON = Button(image=pygame.image.load("assets/Play Rect.png"), pos=(640, 250), 
+                            text_input="JUGAR", font=get_font(75), base_color="#d7fcd4", hovering_color="White")
+        OPTIONS_BUTTON = Button(image=pygame.image.load("assets/Options Rect.png"), pos=(640, 400), 
+                            text_input="OPCIONES", font=get_font(75), base_color="#d7fcd4", hovering_color="White")
+        QUIT_BUTTON = Button(image=pygame.image.load("assets/Quit Rect.png"), pos=(640, 550), 
+                            text_input="SALIR", font=get_font(75), base_color="#d7fcd4", hovering_color="White")
         SCREEN.blit(MENU_TEXT, MENU_RECT)
+        SCREEN.blit(MENU_TEXT1, MENU_RECT1)
 
         for i, button in enumerate(buttons):
             if i == cursor_index:
@@ -119,13 +141,20 @@ def main_menu():
             if joystick_input["buttonA"]:
                 selected_option = menu_items[cursor_index]
                 if selected_option == "PLAY":
+                    click_sound.play() #Reproduce sonido 
+                    pygame.mixer.music.stop() #APAGA MUSICA DEL MAINMENU
+                    pygame.mixer.music.load("sound/ingame.mp3")  # Asegúrate de que el archivo esté en el directorio correcto
+                    pygame.mixer.music.set_volume(0.4)  # Ajustar el volumen al 40%
+                    pygame.mixer.music.play(-1)  # Reproducir en bucle infinito
                     main()
                 elif selected_option == "OPTIONS":
+                    click_sound.play() #Reproduce sonido 
                     options()
                 elif selected_option == "QUIT":
                     pygame.quit()
                     sys.exit()
-
+                    
+        #SELECCION CON MOUSE
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
@@ -134,7 +163,29 @@ def main_menu():
                 for button, action in zip(buttons, [main, options, sys.exit]):
                     if button.checkForInput(MENU_MOUSE_POS):
                         action()
+        for button in [PLAY_BUTTON, OPTIONS_BUTTON, QUIT_BUTTON]:
+            button.changeColor(MENU_MOUSE_POS)
+            button.update(SCREEN)
+            
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if PLAY_BUTTON.checkForInput(MENU_MOUSE_POS):
+                    click_sound.play() #Reproduce sonido 
+                    pygame.mixer.music.stop() #APAGA MUSICA DEL MAINMENU
+                    pygame.mixer.music.load("sound/ingame.mp3")  # Asegúrate de que el archivo esté en el directorio correcto
+                    pygame.mixer.music.set_volume(0.4)  # Ajustar el volumen al 40%
+                    pygame.mixer.music.play(-1)  # Reproducir en bucle infinito
 
+                    main()
+                if OPTIONS_BUTTON.checkForInput(MENU_MOUSE_POS):
+                    click_sound.play() #Reproduce sonido 
+                    options()
+                if QUIT_BUTTON.checkForInput(MENU_MOUSE_POS):
+                    pygame.quit()
+                    sys.exit()
         pygame.display.update()
 
 main_menu()
